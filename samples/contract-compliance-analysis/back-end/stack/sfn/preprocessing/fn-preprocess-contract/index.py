@@ -15,7 +15,8 @@ import logging
 import tempfile
 import re
 import os
-import pdfplumber
+import pymupdf
+from pymupdf4llm.helpers.get_text_lines import get_text_lines
 from difflib import Differ
 
 import boto3
@@ -148,47 +149,27 @@ def handler(event, context):
             logger.info(contract)
         elif key.endswith(".pdf"):
             try:
-                with pdfplumber.open(doc_temp_file) as pdf:
-                    contract = ""
-                    total_pages = len(pdf.pages)
-                    logger.info(f"Processing PDF with {total_pages} pages")
-                    
-                    for i, page in enumerate(pdf.pages, 1):
-                        logger.info(f"Processing page {i} of {total_pages}")
-                        # Extract text with smaller tolerance values to preserve more line breaks
-                        text = page.extract_text(x_tolerance=1, y_tolerance=1)
-                        if text:
-                            # Preserve original line breaks
-                            lines = text.splitlines()
-                            # Process each line while preserving empty lines
-                            processed_text = ""
-                            prev_line = ""
-                            
-                            for line in lines:
-                                if not line.strip():  # Empty line
-                                    processed_text += "\n"
-                                elif not prev_line.strip():  # Previous line was empty
-                                    processed_text += line + "\n"
-                                else:
-                                    processed_text += line + "\n"
-                                prev_line = line
-                            
-                            #contract += processed_text + "\n"  # Add extra line break between pages
-                            contract += processed_text  # Add extra line break between pages
-                            logger.debug(f"Extracted {len(text)} characters from page {i}")
-                        else:
-                            logger.warning(f"No text extracted from page {i}")
-                    
-                    if not contract.strip():
-                        raise ValueError("No text could be extracted from the PDF")
-                    
-                    logger.info(f"Successfully extracted {len(contract)} characters from {total_pages} pages")
-                    
+                pdf = pymupdf.open(doc_temp_file)
+                contract = ""
+                total_pages = len(pdf.pages)
+                logger.info(f"Processing PDF with {total_pages} pages")
+                
+                for i, page in pdf: # iterate the document pages
+                    logger.info(f"Processing page {i} of {total_pages}")
+                    text = page.get_text() # get plain text encoded as UTF-8
+
+                    if text: 
+                        logger.debug(f"Extracted {len(text)} characters from page {i}")
+                    else:
+                        logger.warning(f"No text extracted from page {i}")
+
+                    contract += text    
+                
+                logger.info(f"Successfully extracted {len(contract)} characters from {total_pages} pages")
+            
             except Exception as e:
                 logger.error(f"Error processing PDF file: {str(e)}")
-                raise
-
-
+            raise
         # Split text in chunks of less than 4000 tokens
         chunks = split_chunks(contract)
         # Separate each chunk, including separators between clauses

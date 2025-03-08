@@ -24,4 +24,12 @@ export default defineConfig({
       "./runtimeConfig": "./runtimeConfig.browser", // ensures browser compatible version of AWS JS SDK is used
     },
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "esnext",
+    },
+  },
+  build: {
+    target: "esnext",
+  },
 });
